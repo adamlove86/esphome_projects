@@ -250,6 +250,53 @@ sensor:
       still_energy:
         name: "G8 Still Energy"
 
+    # DHT22 Sensor for Temperature and Humidity
+  - platform: dht
+    pin: GPIO18  # Connect DHT data pin to GPIO18 D10
+    model: AM2302
+    temperature:
+      name: "Temperature"
+      id: Temperature
+      filters:
+        - sliding_window_moving_average:
+            window_size: 10
+            send_every: 1
+            send_first_at: 1
+        - lambda: |-
+            if (x < -40 || x > 80) {
+              ESP_LOGD("Temperature", "Rejected out of range value: %.1f", x);
+              return {};
+            } else {
+              return x;
+            }
+    humidity:
+      name: "Humidity"
+      id: Humidity
+    update_interval: 30s
+
+  # Template Sensor for Apparent Temperature
+  - platform: template
+    name: "Apparent Temperature"
+    unit_of_measurement: '°C'
+    update_interval: 30s
+    lambda: |-
+      float T = id(Temperature).state;
+      float RH = id(Humidity).state;
+      ESP_LOGD("Apparent Temperature", "Temperature: %.2f, Humidity: %.2f", T, RH);
+      if (T < -40 || T > 80 || RH < 0 || RH > 100) {
+        ESP_LOGD("Apparent Temperature", "Rejected out of range values: T: %.2f, RH: %.2f", T, RH);
+        return {};
+      }
+      float alpha = log(RH/100) + ((17.27 * T) / (237.7 + T));
+      float Td = (237.7 * alpha) / (17.27 - alpha);
+      float H = T + 0.5555 * (6.11 * exp((5417.7530 * ((1/273.16) - (1/(273.15 + Td))))) - 10);
+      if (H < -40 || H > 80) {
+        ESP_LOGD("Apparent Temperature", "Calculated out of range apparent temperature: %.2f", H);
+        return {};
+      }
+      ESP_LOGD("Apparent Temperature", "Calculated apparent temperature: %.2f", H);
+      return H;
+
   # Optional: Light Functionality if Supported
   - platform: ld2410
     light:
