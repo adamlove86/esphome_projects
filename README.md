@@ -1,6 +1,6 @@
 # ESPHome Projects Showcase
 
-This collection showcases the various smart home projects I've developed using ESPHome. Hopefully it's useful and save a bit of time for someone with the same/similar components. Each project is organized into its own directory with configuration files and documentation.
+This collection showcases the various smart home projects I've developed using ESPHome. Hopefully it's useful and saves a bit of time for someone with the same/similar components. Each project is organized into its own directory with configuration files and documentation.
 
 ## Projects
 
