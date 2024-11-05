@@ -1,0 +1,326 @@
+esphome:
+  name: bathroom-node-v2-xiao
+  platformio_options:
+    board_build.f_cpu: 160000000L
+    board_build.f_flash: 80000000L
+    board_build.flash_size: 4MB
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+    version: "5.3.1"
+    platform_version: 6.9.0
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_4MB: y
+      CONFIG_ESPTOOLPY_HEADER_FLASHSIZE_UPDATE: "n"
+
+# Enable logging
+logger:
+  level: VERBOSE
+  baud_rate: 0  # Disable UART logging to prevent interference
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret bathroomnode_v2_key
+
+ota:
+  platform: esphome  # Required for ESPHome 2023.6.0 and above
+  password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case Wi-Fi connection fails
+  ap:
+    ssid: "xiao_esp32c6 Hotspot"
+    password: !secret wifi_password
+
+# Web server for monitoring
+web_server:
+  port: 80
+
+# Enable mDNS
+mdns:
+  disabled: False
+
+# Captive portal in case of connection issues
+captive_portal:
+
+# Configuration for the 24GHz mmWave XIAO Radar
+ld2410:
+  id: ld2410_radar
+  throttle: 1000ms  # Time in ms between sensor data updates (adjust as needed, defaults to 1000ms)
+
+# UART configuration with corrected pins
+uart:
+  id: ld2410_uart
+  rx_pin: GPIO2  # ESP32C6 D2 GPIO2 connected to sensor TX
+  tx_pin: GPIO21  # ESP32C6 D3 GPIO21 connected to sensor RX
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
+
+# Number Components for LD2410 Parameters
+number:
+  - platform: ld2410
+    g0:
+      move_threshold:
+        name: "G0 Move Threshold"
+        id: g0_move_threshold
+      still_threshold:
+        name: "G0 Still Threshold"
+        id: g0_still_threshold
+
+  - platform: ld2410
+    g1:
+      move_threshold:
+        name: "G1 Move Threshold"
+        id: g1_move_threshold
+      still_threshold:
+        name: "G1 Still Threshold"
+        id: g1_still_threshold
+
+  - platform: ld2410
+    g2:
+      move_threshold:
+        name: "G2 Move Threshold"
+        id: g2_move_threshold
+      still_threshold:
+        name: "G2 Still Threshold"
+        id: g2_still_threshold
+
+  - platform: ld2410
+    g3:
+      move_threshold:
+        name: "G3 Move Threshold"
+        id: g3_move_threshold
+      still_threshold:
+        name: "G3 Still Threshold"
+        id: g3_still_threshold
+
+  - platform: ld2410
+    g4:
+      move_threshold:
+        name: "G4 Move Threshold"
+        id: g4_move_threshold
+      still_threshold:
+        name: "G4 Still Threshold"
+        id: g4_still_threshold
+
+  - platform: ld2410
+    g5:
+      move_threshold:
+        name: "G5 Move Threshold"
+        id: g5_move_threshold
+      still_threshold:
+        name: "G5 Still Threshold"
+        id: g5_still_threshold
+
+  - platform: ld2410
+    g6:
+      move_threshold:
+        name: "G6 Move Threshold"
+        id: g6_move_threshold
+      still_threshold:
+        name: "G6 Still Threshold"
+        id: g6_still_threshold
+
+  - platform: ld2410
+    g7:
+      move_threshold:
+        name: "G7 Move Threshold"
+        id: g7_move_threshold
+      still_threshold:
+        name: "G7 Still Threshold"
+        id: g7_still_threshold
+
+  - platform: ld2410
+    g8:
+      move_threshold:
+        name: "G8 Move Threshold"
+        id: g8_move_threshold
+      still_threshold:
+        name: "G8 Still Threshold"
+        id: g8_still_threshold
+
+# Switch Component for Engineering Mode
+switch:
+  - platform: ld2410
+    engineering_mode:
+      name: "Engineering Mode"
+      id: engineering_mode_switch
+      restore_mode: ALWAYS_ON  # Enable engineering mode on startup
+
+# Binary Sensors for LD2410
+binary_sensor:
+  - platform: ld2410
+    has_target:
+      name: "Radar Target"
+      id: radar_has_target
+      on_press:
+        then:
+          - script.execute: flash_led_script
+    has_moving_target:
+      name: "Radar Moving Target"
+      id: radar_moving_target
+    has_still_target:
+      name: "Radar Still Target"
+      id: radar_still_target
+
+  # Additional GPIO Binary Sensor for Presence Detection
+  - platform: gpio
+    pin: GPIO10  # Replace with an appropriate GPIO pin for your ESP32C6
+    name: "GPIO Presence"
+    device_class: presence
+
+# Sensors for LD2410
+sensor:
+  - platform: ld2410
+    moving_distance:
+      name: "Radar Moving Distance"
+      id: radar_moving_distance
+      unit_of_measurement: "cm"
+      device_class: distance
+    still_distance:
+      name: "Radar Still Distance"
+      id: radar_still_distance
+      unit_of_measurement: "cm"
+      device_class: distance
+    moving_energy:
+      name: "Radar Move Energy"
+      unit_of_measurement: "%"
+      device_class: power
+    still_energy:
+      name: "Radar Still Energy"
+      unit_of_measurement: "%"
+      device_class: power
+    detection_distance:
+      name: "Radar Detection Distance"
+      id: radar_detection_distance
+      unit_of_measurement: "cm"
+      device_class: distance
+    g0:
+      move_energy:
+        name: "G0 Move Energy"
+      still_energy:
+        name: "G0 Still Energy"
+    g1:
+      move_energy:
+        name: "G1 Move Energy"
+      still_energy:
+        name: "G1 Still Energy"
+    g2:
+      move_energy:
+        name: "G2 Move Energy"
+      still_energy:
+        name: "G2 Still Energy"
+    g3:
+      move_energy:
+        name: "G3 Move Energy"
+      still_energy:
+        name: "G3 Still Energy"
+    g4:
+      move_energy:
+        name: "G4 Move Energy"
+      still_energy:
+        name: "G4 Still Energy"
+    g5:
+      move_energy:
+        name: "G5 Move Energy"
+      still_energy:
+        name: "G5 Still Energy"
+    g6:
+      move_energy:
+        name: "G6 Move Energy"
+      still_energy:
+        name: "G6 Still Energy"
+    g7:
+      move_energy:
+        name: "G7 Move Energy"
+      still_energy:
+        name: "G7 Still Energy"
+    g8:
+      move_energy:
+        name: "G8 Move Energy"
+      still_energy:
+        name: "G8 Still Energy"
+
+  # Optional: Light Functionality if Supported
+  - platform: ld2410
+    light:
+      name: "LD2410 Light"
+
+# Text Sensors for Additional Information
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "Node IP Address"
+
+  - platform: ld2410
+    version:
+      name: "Firmware Version"
+    mac_address:
+      name: "MAC Address"
+
+# Output for Status LED
+output:
+  - platform: gpio
+    pin: GPIO0  # Use GPIO0 for the status LED
+    inverted: true
+    id: status_led
+
+# Script for Flashing the LED When Motion is Detected
+script:
+  - id: flash_led_script
+    mode: restart
+    then:
+      - repeat:
+          count: 3  # Number of flashes (adjust as needed)
+          then:
+            - output.turn_on: status_led
+            - delay: 500ms
+            - output.turn_off: status_led
+            - delay: 500ms
+
+# Interval to Check Wi-Fi Connection and Blink LED if Disconnected
+interval:
+  - interval: 2s
+    then:
+      - if:
+          condition:
+            not:
+              wifi.connected: {}
+          then:
+            - output.turn_on: status_led
+            - delay: 1s
+            - output.turn_off: status_led
+            - delay: 1s
+
+# Select Components for LD2410 Configuration
+select:
+  - platform: ld2410
+    distance_resolution:
+      name: "Distance Resolution"
+    baud_rate:
+      name: "UART Baud Rate"
+    light_function:
+      name: "Light Function"
+    out_pin_level:
+      name: "OUT Pin Level"
+
+# Button Components for LD2410 Actions
+button:
+  - platform: ld2410
+    factory_reset:
+      name: "Factory Reset"
+  - platform: ld2410
+    restart:
+      name: "Restart"
+  - platform: ld2410
+    query_params:
+      name: "Query Parameters"

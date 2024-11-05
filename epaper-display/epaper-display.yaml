@@ -1,0 +1,195 @@
+esphome:
+  name: epaper-display
+  platform: ESP32
+  board: esp32dev
+  on_boot:
+    priority: -100
+    then:
+      - delay: 1min
+      - component.update: epaper_display
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "Epaper Display Fallback Hotspot"
+    password: !secret wifi_password
+
+captive_portal:
+
+logger:
+  level: DEBUG
+  logs:
+    waveshare_epaper: DEBUG
+
+api:
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+spi:
+  clk_pin: GPIO13
+  mosi_pin: GPIO14
+
+font:
+  - file: "fonts/Arial.ttf"
+    id: font_small
+    size: 12
+  - file: "fonts/Arial.ttf"
+    id: font_medium
+    size: 16
+  - file: "fonts/Arial.ttf"
+    id: font_large
+    size: 20
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+sensor:
+  - platform: homeassistant
+    id: weather_temperature
+    entity_id: sensor.home_realfeel_temperature
+  - platform: homeassistant
+    id: kitchen_temperature
+    entity_id: sensor.kitchennode_apparent_temperature
+  - platform: homeassistant
+    id: bedroom_temperature
+    entity_id: sensor.bedroomnode_apparent_temperature
+  - platform: homeassistant
+    id: bathroom_temperature
+    entity_id: sensor.bathrooomnode_apparent_temperature
+  - platform: homeassistant
+    id: total_steps
+    entity_id: sensor.total_steps
+  - platform: homeassistant
+    id: active_calories
+    entity_id: sensor.active_kilocalories
+  - platform: homeassistant
+    id: active_time
+    entity_id: sensor.highly_active_time
+  - platform: homeassistant
+    id: sleep_duration
+    entity_id: sensor.sleep_duration
+  - platform: homeassistant
+    id: weather_max_temp
+    entity_id: sensor.home_realfeel_temperature_max_today
+  - platform: homeassistant
+    id: weather_min_temp
+    entity_id: sensor.home_realfeel_temperature_min_today
+  - platform: homeassistant
+    id: weather_precipitation
+    entity_id: sensor.home_precipitation
+
+text_sensor:
+  - platform: homeassistant
+    id: weather_condition
+    entity_id: weather.home
+  - platform: homeassistant
+    id: todo_list
+    entity_id: todo.my_tasks
+  - platform: homeassistant
+    id: work_calendar
+    entity_id: calendar.adam_love_work
+    attribute: message
+  - platform: homeassistant
+    id: personal_calendar
+    entity_id: calendar.adam_s_personal_calendar
+    attribute: message
+  - platform: homeassistant
+    id: gigs_calendar
+    entity_id: calendar.adam_love_gigs_availability
+    attribute: message
+
+switch:
+  - platform: template
+    name: "Force Display Update"
+    id: force_display_update
+    turn_on_action:
+      - component.update: epaper_display
+
+display:
+  - platform: waveshare_epaper
+    id: epaper_display
+    cs_pin: GPIO15
+    dc_pin: GPIO27
+    busy_pin:
+      number: GPIO25
+      inverted: true
+    reset_pin: GPIO26
+    model: 7.50inv2alt
+    update_interval: 30min
+    lambda: |
+      it.rectangle(0, 0, it.get_width(), it.get_height());
+
+      // Date and Time
+      auto time = id(homeassistant_time).now();
+      it.printf(10, 10, id(font_large), "Date: %04d-%02d-%02d %02d:%02d", time.year, time.month, time.day_of_month, time.hour, time.minute);
+
+      // Left Column
+      int left_x = 10;
+      int y = 50;
+
+      // Weather
+      it.rectangle(left_x, y, 380, 180);
+      it.printf(left_x + 10, y + 10, id(font_medium), "Weather: %.1f°C", id(weather_temperature).state);
+      it.printf(left_x + 10, y + 40, id(font_small), "Max: %.1f°C", id(weather_max_temp).state);
+      it.printf(left_x + 10, y + 60, id(font_small), "Min: %.1f°C", id(weather_min_temp).state);
+      it.printf(left_x + 10, y + 80, id(font_small), "Rain: %.1f mm", id(weather_precipitation).state);
+      it.printf(left_x + 10, y + 100, id(font_small), "Condition: %s", id(weather_condition).state.c_str());
+      y += 190;
+
+      // Room Temperatures
+      it.rectangle(left_x, y, 380, 120);
+      it.printf(left_x + 10, y + 10, id(font_small), "Kitchen: %.1f°C", id(kitchen_temperature).state);
+      it.printf(left_x + 10, y + 40, id(font_small), "Bedroom: %.1f°C", id(bedroom_temperature).state);
+      it.printf(left_x + 10, y + 70, id(font_small), "Bathroom: %.1f°C", id(bathroom_temperature).state);
+      y += 130;
+
+      // Right Column
+      int right_x = 400;
+      y = 50;
+
+      // Fitness Data
+      it.rectangle(right_x, y, 380, 150);
+      it.printf(right_x + 10, y + 10, id(font_small), "Steps today: %d", int(id(total_steps).state));
+      it.printf(right_x + 10, y + 40, id(font_small), "Active Cal: %.0f", id(active_calories).state);
+      it.printf(right_x + 10, y + 70, id(font_small), "Active Time: %d min", int(id(active_time).state));
+      it.printf(right_x + 10, y + 100, id(font_small), "Sleep: %.1f hours", float(id(sleep_duration).state) / 60.0);
+      y += 160;
+
+      // Calendar Events
+      it.rectangle(right_x, y, 380, 180);
+      it.printf(right_x + 10, y + 10, id(font_small), "Upcoming Events:");
+      int event_y = y + 30;
+      if (id(work_calendar).has_state()) {
+        it.printf(right_x + 10, event_y, id(font_small), "Work: %s", id(work_calendar).state.c_str());
+        event_y += 20;
+      }
+      if (id(personal_calendar).has_state()) {
+        it.printf(right_x + 10, event_y, id(font_small), "Personal: %s", id(personal_calendar).state.c_str());
+        event_y += 20;
+      }
+      if (id(gigs_calendar).has_state()) {
+        it.printf(right_x + 10, event_y, id(font_small), "Gigs: %s", id(gigs_calendar).state.c_str());
+        event_y += 20;
+      }
+      y = event_y + 10;
+
+      // Todo List (placeholder for now)
+      it.rectangle(right_x, y, 380, 100);
+      it.printf(right_x + 10, y + 10, id(font_small), "Todos: %s", id(todo_list).state.c_str());
+      y += 110;
+
+      // Habit Tracker (placeholder)
+      it.rectangle(right_x, y, 380, 100);
+      it.printf(right_x + 10, y + 10, id(font_small), "Habit Tracker");
+
+      // Connection Status
+      if (wifi::global_wifi_component->is_connected()) {
+        it.printf(10, it.get_height() - 20, id(font_small), "Online");
+      } else {
+        it.printf(10, it.get_height() - 20, id(font_small), "Offline");
+      }

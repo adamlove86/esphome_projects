@@ -1,0 +1,119 @@
+esphome:
+  name: bathrooomnode
+  friendly_name: Bathroom Node
+
+esp8266:
+  board: nodemcuv2
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Bathroom Node Fallback Hotspot"
+    password: !secret wifi_password
+
+captive_portal:
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret bathroomnode_key
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+output:
+  - platform: gpio
+    pin: D0
+    inverted: true
+    id: status_led
+
+interval:
+  - interval: 2s
+    then:
+      - if:
+          condition:
+            not:
+              wifi.connected: {}
+          then:
+            - output.turn_on: status_led
+            - delay: 1s
+            - output.turn_off: status_led
+            - delay: 1s
+
+script:
+  - id: flash_led_script
+    mode: restart
+    then:
+      - repeat:
+          count: 100
+          then:
+            - output.turn_on: status_led
+            - delay: 500ms
+            - output.turn_off: status_led
+            - delay: 500ms
+
+binary_sensor:
+  - platform: gpio
+    pin: D7
+    name: "IR Movement"
+    device_class: motion
+    filters:
+      - delayed_on: 500ms
+      - delayed_off: 500ms
+    on_press:
+      then:
+        - script.execute: flash_led_script
+
+sensor:
+  - platform: dht
+    pin: D4
+    model: AM2302
+    temperature:
+      name: "Temperature"
+      id: Temperature
+      filters:
+        - sliding_window_moving_average:
+            window_size: 10
+            send_every: 1
+            send_first_at: 1
+        - lambda: |-
+            if (x < -40 || x > 80) {
+              ESP_LOGD("Temperature", "Rejected out of range value: %.1f", x);
+              return {};
+            } else {
+              return x;
+            }
+    humidity:
+      name: "Humidity"
+      id: Humidity
+    update_interval: 30s
+  - platform: template
+    name: "Apparent Temperature"
+    unit_of_measurement: '°C'
+    update_interval: 30s
+    lambda: |-
+      float T = id(Temperature).state;
+      float RH = id(Humidity).state;
+      ESP_LOGD("Apparent Temperature", "Temperature: %.2f, Humidity: %.2f", T, RH);
+      if (T < -40 || T > 80 || RH < 0 || RH > 100) {
+        ESP_LOGD("Apparent Temperature", "Rejected out of range values: T: %.2f, RH: %.2f", T, RH);
+        return {};
+      }
+      float alpha = log(RH/100) + ((17.27 * T) / (237.7 + T));
+      float Td = (237.7 * alpha) / (17.27 - alpha);
+      float H = T + 0.5555 * (6.11 * exp((5417.7530 * ((1 / 273.16) - (1 / (273.15 + Td))))) - 10);
+      if (H < -40 || H > 80) {
+        ESP_LOGD("Apparent Temperature", "Calculated out of range apparent temperature: %.2f", H);
+        return {};
+      }
+      ESP_LOGD("Apparent Temperature", "Calculated apparent temperature: %.2f", H);
+      return H;
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "Node IP Address"

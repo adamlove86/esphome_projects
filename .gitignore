@@ -1,0 +1,18 @@
+# Ignore temporary files
+*.tmp
+*.log
+*.swp
+
+# Ignore IDE/editor directories and files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore compiled or build directories
+.pio/
+build/
+
+# Ignore any other unwanted files
+trash/
+secrets.yaml
