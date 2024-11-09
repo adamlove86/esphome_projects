@@ -1,0 +1,10 @@
+substitutions:
+  node_name: "bedroom-node-v2-xiao"
+  room_name: "Bedroom"
+  api_encryption_key: !secret bedroomnode_v2_key
+  status_led_gpio: GPIO14
+  presence_gpio: GPIO13
+  uart_rx_pin: GPIO2
+  uart_tx_pin: GPIO21
+
+<<: !include common-node-config.yaml

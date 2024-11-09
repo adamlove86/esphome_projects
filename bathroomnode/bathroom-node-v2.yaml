@@ -1,0 +1,10 @@
+substitutions:
+  node_name: "bathroom-node-v2-xiao"
+  room_name: "Bathroom"
+  api_encryption_key: !secret bathroomnode_v2_key
+  status_led_gpio: GPIO15
+  presence_gpio: GPIO0
+  uart_rx_pin: GPIO2
+  uart_tx_pin: GPIO21
+
+<<: !include common-node-config.yaml
