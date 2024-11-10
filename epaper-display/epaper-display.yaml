@@ -24,10 +24,15 @@ logger:
     waveshare_epaper: DEBUG
 
 api:
+  encryption:
+    key: !secret epaper_display_key
 
 ota:
-  platform: esphome
-  password: !secret ota_password
+  - platform: esphome
+    password: !secret ota_password
+
+web_server:
+  port: 80
 
 spi:
   clk_pin: GPIO13
@@ -36,13 +41,23 @@ spi:
 font:
   - file: "fonts/Arial.ttf"
     id: font_small
-    size: 12
-  - file: "fonts/Arial.ttf"
-    id: font_medium
-    size: 16
+    size: 21  # Increased by 50%
+
+  - file: "fonts/ARIALBD.TTF"
+    id: font_small_bold
+    size: 21  # Increased by 50%
+
+  - file: "fonts/ARIALI.TTF"
+    id: font_small_italic
+    size: 21  # Increased by 50%
+
+  - file: "fonts/ARIALBD.TTF"
+    id: font_medium_bold
+    size: 24  # Increased by 50%
+
   - file: "fonts/Arial.ttf"
     id: font_large
-    size: 20
+    size: 30  # Increased by 50%
 
 time:
   - platform: homeassistant
@@ -52,33 +67,43 @@ sensor:
   - platform: homeassistant
     id: weather_temperature
     entity_id: sensor.home_realfeel_temperature
+
   - platform: homeassistant
     id: kitchen_temperature
     entity_id: sensor.kitchennode_apparent_temperature
+
   - platform: homeassistant
     id: bedroom_temperature
     entity_id: sensor.bedroomnode_apparent_temperature
+
   - platform: homeassistant
     id: bathroom_temperature
     entity_id: sensor.bathrooomnode_apparent_temperature
+
   - platform: homeassistant
     id: total_steps
     entity_id: sensor.total_steps
+
   - platform: homeassistant
     id: active_calories
     entity_id: sensor.active_kilocalories
+
   - platform: homeassistant
     id: active_time
     entity_id: sensor.highly_active_time
+
   - platform: homeassistant
     id: sleep_duration
     entity_id: sensor.sleep_duration
+
   - platform: homeassistant
     id: weather_max_temp
     entity_id: sensor.home_realfeel_temperature_max_today
+
   - platform: homeassistant
     id: weather_min_temp
     entity_id: sensor.home_realfeel_temperature_min_today
+
   - platform: homeassistant
     id: weather_precipitation
     entity_id: sensor.home_precipitation
@@ -87,27 +112,62 @@ text_sensor:
   - platform: homeassistant
     id: weather_condition
     entity_id: weather.home
+    attribute: state
+
   - platform: homeassistant
     id: todo_list
     entity_id: todo.my_tasks
+
   - platform: homeassistant
     id: work_calendar
     entity_id: calendar.adam_love_work
     attribute: message
+
+  - platform: homeassistant
+    id: work_calendar_time
+    entity_id: calendar.adam_love_work
+    attribute: start_time
+
   - platform: homeassistant
     id: personal_calendar
     entity_id: calendar.adam_s_personal_calendar
     attribute: message
+
+  - platform: homeassistant
+    id: personal_calendar_time
+    entity_id: calendar.adam_s_personal_calendar
+    attribute: start_time
+
   - platform: homeassistant
     id: gigs_calendar
     entity_id: calendar.adam_love_gigs_availability
     attribute: message
 
-switch:
+  - platform: homeassistant
+    id: gigs_calendar_time
+    entity_id: calendar.adam_love_gigs_availability
+    attribute: start_time
+
+image:
+  - file: "images/puppy_cropped_centered_800x480.bmp"
+    id: puppy_image
+    type: BINARY
+
+button:
   - platform: template
     name: "Force Display Update"
     id: force_display_update
+    on_press:
+      - component.update: epaper_display
+
+switch:
+  - platform: template
+    name: "Display Image"
+    id: display_image
+    optimistic: true
     turn_on_action:
+      - component.update: epaper_display
+    turn_off_action:
       - component.update: epaper_display
 
 display:
@@ -119,77 +179,233 @@ display:
       number: GPIO25
       inverted: true
     reset_pin: GPIO26
-    model: 7.50inv2alt
-    update_interval: 30min
-    lambda: |
-      it.rectangle(0, 0, it.get_width(), it.get_height());
+    model: 7.50inv2alt  # Updated for tricolor display
+    update_interval: 60min
+    reset_duration: 500ms
+    rotation: 0
+    lambda: |-
+      // Check if display_image switch is on
+      if (id(display_image).state) {
+        // Display the image fullscreen
+        it.image(0, 0, id(puppy_image));
+        return;
+      }
 
-      // Date and Time
-      auto time = id(homeassistant_time).now();
-      it.printf(10, 10, id(font_large), "Date: %04d-%02d-%02d %02d:%02d", time.year, time.month, time.day_of_month, time.hour, time.minute);
+      // Clear the display
+      it.fill(COLOR_OFF);
+
+      // Margins and positions
+      const int margin = 10;
+      int y = margin + 5;
+      int left_x = margin;
+      int right_x = it.get_width() / 2 + margin;
+
+      // Date
+      auto current_time = id(homeassistant_time).now();
+      const char *weekday;
+      const char *month_str;
+      int day = current_time.day_of_month;
+      int year = current_time.year;
+
+      // Map weekday number to string
+      // Replace 'day_of_week' with the correct member if different in your ESPHome version
+      switch (current_time.day_of_week) { 
+        case 0: weekday = "Sunday"; break;
+        case 1: weekday = "Monday"; break;
+        case 2: weekday = "Tuesday"; break;
+        case 3: weekday = "Wednesday"; break;
+        case 4: weekday = "Thursday"; break;
+        case 5: weekday = "Friday"; break;
+        case 6: weekday = "Saturday"; break;
+        default: weekday = "Unknown"; break;
+      }
+
+      // Map month number to string
+      switch (current_time.month) {
+        case 1: month_str = "January"; break;
+        case 2: month_str = "February"; break;
+        case 3: month_str = "March"; break;
+        case 4: month_str = "April"; break;
+        case 5: month_str = "May"; break;
+        case 6: month_str = "June"; break;
+        case 7: month_str = "July"; break;
+        case 8: month_str = "August"; break;
+        case 9: month_str = "September"; break;
+        case 10: month_str = "October"; break;
+        case 11: month_str = "November"; break;
+        case 12: month_str = "December"; break;
+        default: month_str = "Unknown"; break;
+      }
+
+      // Determine ordinal suffix
+      std::string ordinal;
+      if (day % 100 >= 11 && day % 100 <= 13) {
+        ordinal = "th";
+      } else {
+        switch (day % 10) {
+          case 1: ordinal = "st"; break;
+          case 2: ordinal = "nd"; break;
+          case 3: ordinal = "rd"; break;
+          default: ordinal = "th"; break;
+        }
+      }
+
+      // Compose date string
+      std::string date_str = std::string(weekday) + ", " + std::to_string(day) + ordinal + " " + std::string(month_str) + ", " + std::to_string(year);
+      it.print(margin, y, id(font_large), COLOR_ON, date_str.c_str());
+      y += 45; // Move down after date (adjusted for larger font)
 
       // Left Column
-      int left_x = 10;
-      int y = 50;
+      int left_y = y;
+      int line_height_small = 32; // 21px font size * 1.5
+      int line_height_medium = 36; // 24px font size * 1.5
 
-      // Weather
-      it.rectangle(left_x, y, 380, 180);
-      it.printf(left_x + 10, y + 10, id(font_medium), "Weather: %.1f°C", id(weather_temperature).state);
-      it.printf(left_x + 10, y + 40, id(font_small), "Max: %.1f°C", id(weather_max_temp).state);
-      it.printf(left_x + 10, y + 60, id(font_small), "Min: %.1f°C", id(weather_min_temp).state);
-      it.printf(left_x + 10, y + 80, id(font_small), "Rain: %.1f mm", id(weather_precipitation).state);
-      it.printf(left_x + 10, y + 100, id(font_small), "Condition: %s", id(weather_condition).state.c_str());
-      y += 190;
+      // Weather Section Title
+      it.print(left_x, left_y, id(font_medium_bold), COLOR_ON, "Weather");
+      left_y += line_height_medium;
 
-      // Room Temperatures
-      it.rectangle(left_x, y, 380, 120);
-      it.printf(left_x + 10, y + 10, id(font_small), "Kitchen: %.1f°C", id(kitchen_temperature).state);
-      it.printf(left_x + 10, y + 40, id(font_small), "Bedroom: %.1f°C", id(bedroom_temperature).state);
-      it.printf(left_x + 10, y + 70, id(font_small), "Bathroom: %.1f°C", id(bathroom_temperature).state);
-      y += 130;
-
-      // Right Column
-      int right_x = 400;
-      y = 50;
-
-      // Fitness Data
-      it.rectangle(right_x, y, 380, 150);
-      it.printf(right_x + 10, y + 10, id(font_small), "Steps today: %d", int(id(total_steps).state));
-      it.printf(right_x + 10, y + 40, id(font_small), "Active Cal: %.0f", id(active_calories).state);
-      it.printf(right_x + 10, y + 70, id(font_small), "Active Time: %d min", int(id(active_time).state));
-      it.printf(right_x + 10, y + 100, id(font_small), "Sleep: %.1f hours", float(id(sleep_duration).state) / 60.0);
-      y += 160;
-
-      // Calendar Events
-      it.rectangle(right_x, y, 380, 180);
-      it.printf(right_x + 10, y + 10, id(font_small), "Upcoming Events:");
-      int event_y = y + 30;
-      if (id(work_calendar).has_state()) {
-        it.printf(right_x + 10, event_y, id(font_small), "Work: %s", id(work_calendar).state.c_str());
-        event_y += 20;
-      }
-      if (id(personal_calendar).has_state()) {
-        it.printf(right_x + 10, event_y, id(font_small), "Personal: %s", id(personal_calendar).state.c_str());
-        event_y += 20;
-      }
-      if (id(gigs_calendar).has_state()) {
-        it.printf(right_x + 10, event_y, id(font_small), "Gigs: %s", id(gigs_calendar).state.c_str());
-        event_y += 20;
-      }
-      y = event_y + 10;
-
-      // Todo List (placeholder for now)
-      it.rectangle(right_x, y, 380, 100);
-      it.printf(right_x + 10, y + 10, id(font_small), "Todos: %s", id(todo_list).state.c_str());
-      y += 110;
-
-      // Habit Tracker (placeholder)
-      it.rectangle(right_x, y, 380, 100);
-      it.printf(right_x + 10, y + 10, id(font_small), "Habit Tracker");
-
-      // Connection Status
-      if (wifi::global_wifi_component->is_connected()) {
-        it.printf(10, it.get_height() - 20, id(font_small), "Online");
+      // Current Temperature
+      if (!isnan(id(weather_temperature).state)) {
+        it.printf(left_x, left_y, id(font_medium_bold), COLOR_ON, "%.1f°C", id(weather_temperature).state);
       } else {
-        it.printf(10, it.get_height() - 20, id(font_small), "Offline");
+        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "N/A");
+      }
+      left_y += line_height_medium;
+
+      // Max Temperature
+      if (!isnan(id(weather_max_temp).state)) {
+        it.printf(left_x, left_y, id(font_small), COLOR_ON, "Max: %.1f°C", id(weather_max_temp).state);
+      } else {
+        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Max: N/A");
+      }
+      left_y += line_height_small;
+
+      // Min Temperature
+      if (!isnan(id(weather_min_temp).state)) {
+        it.printf(left_x, left_y, id(font_small), COLOR_ON, "Min: %.1f°C", id(weather_min_temp).state);
+      } else {
+        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Min: N/A");
+      }
+      left_y += line_height_small;
+
+      // Rain
+      if (!isnan(id(weather_precipitation).state)) {
+        it.printf(left_x, left_y, id(font_small), COLOR_ON, "Rain: %.1f mm", id(weather_precipitation).state);
+      } else {
+        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Rain: N/A");
+      }
+      left_y += line_height_small + 10; // Extra spacing before next section
+
+      // Room Temperatures Section Title
+      it.print(left_x, left_y, id(font_medium_bold), COLOR_ON, "Room Temperatures");
+      left_y += line_height_medium;
+
+      // Kitchen Temperature
+      if (!isnan(id(kitchen_temperature).state)) {
+        it.printf(left_x, left_y, id(font_small), COLOR_ON, "Kitchen: %.1f°C", id(kitchen_temperature).state);
+      } else {
+        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Kitchen: N/A");
+      }
+      left_y += line_height_small;
+
+      // Bedroom Temperature
+      if (!isnan(id(bedroom_temperature).state)) {
+        it.printf(left_x, left_y, id(font_small), COLOR_ON, "Bedroom: %.1f°C", id(bedroom_temperature).state);
+      } else {
+        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Bedroom: N/A");
+      }
+      left_y += line_height_small;
+
+      // Bathroom Temperature
+      if (!isnan(id(bathroom_temperature).state)) {
+        it.printf(left_x, left_y, id(font_small), COLOR_ON, "Bathroom: %.1f°C", id(bathroom_temperature).state);
+      } else {
+        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Bathroom: N/A");
+      }
+      left_y += line_height_small + 10; // Extra spacing before next section
+
+      // Habit Tracker Placeholder
+      it.print(left_x, left_y, id(font_medium_bold), COLOR_ON, "Habit Tracker");
+      // Leave space for future content
+      left_y += line_height_medium + line_height_small * 3;
+
+      // Upcoming Events Section Title
+      it.print(right_x, y, id(font_medium_bold), COLOR_ON, "Upcoming Events");
+      int right_y = y + line_height_medium;
+
+      // Collect Events
+      struct Event {
+        std::string name;
+        std::string time;
+      };
+      std::vector<Event> events_list;
+
+      if (id(work_calendar).has_state() && id(work_calendar_time).has_state()) {
+        events_list.emplace_back(Event{"Work: " + id(work_calendar).state, id(work_calendar_time).state});
+      }
+      if (id(personal_calendar).has_state() && id(personal_calendar_time).has_state()) {
+        events_list.emplace_back(Event{"Personal: " + id(personal_calendar).state, id(personal_calendar_time).state});
+      }
+      if (id(gigs_calendar).has_state() && id(gigs_calendar_time).has_state()) {
+        events_list.emplace_back(Event{"Gigs: " + id(gigs_calendar).state, id(gigs_calendar_time).state});
+      }
+
+      // Sort Events by Time
+      std::sort(events_list.begin(), events_list.end(), [](const Event &a, const Event &b) -> bool {
+        return a.time < b.time;
+      });
+
+      // Display Events (Limit to 4)
+      int event_count = 0;
+      for (const auto &event : events_list) {
+        if (event_count < 4) {
+          // Extract time part from ISO 8601 format
+          std::string event_time = event.time.substr(11, 5);
+          std::string event_display = event_time + " - " + event.name;
+          it.print(right_x, right_y, id(font_small), COLOR_ON, event_display.c_str());
+          right_y += line_height_small;
+          event_count++;
+        }
+      }
+      if (events_list.size() > 4) {
+        it.print(right_x, right_y, id(font_small), COLOR_ON, "...more events");
+        right_y += line_height_small;
+      } else if (events_list.empty()) {
+        it.print(right_x, right_y, id(font_small_italic), COLOR_ON, "No upcoming events");
+        right_y += line_height_small;
+      }
+      right_y += 10; // Extra spacing before next section
+
+      // Fitness Data Section Title
+      it.print(right_x, right_y, id(font_medium_bold), COLOR_ON, "Fitness Data");
+      right_y += line_height_medium;
+
+      // Active Calories
+      if (!isnan(id(active_calories).state)) {
+        it.printf(right_x, right_y, id(font_small), COLOR_ON, "Active Calories: %.0f kcal", id(active_calories).state);
+      } else {
+        it.print(right_x, right_y, id(font_small_italic), COLOR_ON, "Active Calories: N/A");
+      }
+      right_y += line_height_small;
+
+      // Sleep Duration
+      if (!isnan(id(sleep_duration).state)) {
+        float sleep_hours = id(sleep_duration).state / 60.0;
+        it.printf(right_x, right_y, id(font_small), COLOR_ON, "Sleep: %.1f hours", sleep_hours);
+      } else {
+        it.print(right_x, right_y, id(font_small_italic), COLOR_ON, "Sleep: N/A");
+      }
+      right_y += line_height_small;
+
+      // Steps Today
+      if (!isnan(id(total_steps).state)) {
+        it.printf(right_x, right_y, id(font_small), COLOR_ON, "Steps today: %d", (int)id(total_steps).state);
+      } else {
+        it.print(right_x, right_y, id(font_small_italic), COLOR_ON, "Steps today: N/A");
+      }
+      right_y += line_height_small + 10; // Extra spacing before next section
+
+      // Connection Status at the bottom left
+      if (!wifi::global_wifi_component->is_connected()) {
+        it.print(margin, it.get_height() - line_height_small, id(font_small), COLOR_ON, "Offline");
       }
