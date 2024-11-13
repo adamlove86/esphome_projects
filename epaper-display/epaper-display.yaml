@@ -233,7 +233,7 @@ select:
     initial_option: "8"
     set_action:
       - lambda: |-
-          id(morning_hour_threshold) = x.toInt();
+          id(morning_hour_threshold) = atoi(x.c_str());
 
   - platform: template
     name: "Evening Hour Threshold"
@@ -242,7 +242,7 @@ select:
     initial_option: "17"
     set_action:
       - lambda: |-
-          id(evening_hour_threshold) = x.toInt();
+          id(evening_hour_threshold) = atoi(x.c_str());
 
   - platform: template
     name: "Display Update Interval (minutes)"
@@ -251,7 +251,7 @@ select:
     initial_option: "15"
     set_action:
       - lambda: |-
-          id(display_update_interval) = x.toInt();
+          id(display_update_interval) = atoi(x.c_str());
 
 globals:
   - id: morning_hour_threshold
