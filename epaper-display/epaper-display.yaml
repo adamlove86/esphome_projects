@@ -2,11 +2,19 @@ substitutions:
   # Time variables
   morning_hour_threshold: '8'    # Hour before which certain actions occur (e.g., 8 AM)
   evening_hour_threshold: '17'   # Hour after which certain actions occur (e.g., 5 PM)
-  display_update_interval: '15'  # Regular display refresh interval in minutes
+  display_update_interval: '60'  # Regular display refresh interval in minutes
   initial_refresh_delay: '1'     # Delay after boot-up before the first refresh (in minutes)
 
   # Device configuration
   device_ip: !secret epaper_device_ip  # IP address of the ePaper display device
+
+  # Calendar display options
+  calendar_1_bold: 'true'
+  calendar_1_red: 'false'
+  calendar_2_bold: 'false'
+  calendar_2_red: 'false'
+  calendar_3_bold: 'false'
+  calendar_3_red: 'true'
 
   # Entity IDs
   person_entity: !secret person_entity          # Entity ID of the person to monitor for presence
@@ -20,9 +28,9 @@ substitutions:
 
   # Sensor entity IDs (these are not sensitive)
   weather_temperature_entity: 'sensor.home_realfeel_temperature'  # Entity ID for weather temperature
-  kitchen_temperature_entity: 'sensor.kitchennode_apparent_temperature'  # Entity ID for kitchen temperature
-  bedroom_temperature_entity: 'sensor.bedroomnode_apparent_temperature'  # Entity ID for bedroom temperature
-  bathroom_temperature_entity: 'sensor.bathrooomnode_apparent_temperature'  # Entity ID for bathroom temperature
+  kitchen_temperature_entity: 'sensor.kitchen_apparent_temperature'  # Entity ID for kitchen temperature
+  bedroom_temperature_entity: 'sensor.bedroom_apparent_temperature'  # Entity ID for bedroom temperature
+  bathroom_temperature_entity: 'sensor.bathroom_apparent_temperature'  # Entity ID for bathroom temperature
   total_steps_entity: 'sensor.total_steps'  # Entity ID for total steps count
   active_calories_entity: 'sensor.active_kilocalories'  # Entity ID for active calories burned
   active_time_entity: 'sensor.highly_active_time'  # Entity ID for active time
@@ -52,7 +60,7 @@ external_components:
       ref: waveshare-red-black
     components: [ waveshare_epaper ]
 
-# Do not change the following:
+# Wi-Fi Configuration
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
@@ -84,22 +92,23 @@ spi:
   clk_pin: GPIO13
   mosi_pin: GPIO14
 
+# Updated Font Sizes
 font:
   - file: "fonts/Arial.ttf"
     id: font_small
-    size: 21  # Increased font size
+    size: 20  # Increased font size
 
   - file: "fonts/ARIALBD.TTF"
     id: font_small_bold
-    size: 21  # Increased font size
+    size: 20  # Increased font size
 
   - file: "fonts/ARIALI.TTF"
     id: font_small_italic
-    size: 21  # Increased font size
+    size: 20  # Increased font size
 
   - file: "fonts/ARIALBD.TTF"
     id: font_medium_bold
-    size: 24  # Increased font size
+    size: 22  # Increased font size
 
   - file: "fonts/Arial.ttf"
     id: font_large
@@ -154,7 +163,6 @@ sensor:
     id: weather_precipitation
     entity_id: ${weather_precipitation_entity}
 
-  # Added Uptime Sensor
   - platform: uptime
     name: "Device Uptime"
     id: device_uptime
@@ -203,6 +211,8 @@ text_sensor:
   - platform: homeassistant
     id: person_presence
     entity_id: ${person_entity}
+    name: "Person Presence"
+    internal: false
 
   - platform: template
     name: "Time Since Last Refresh"
@@ -247,8 +257,8 @@ select:
   - platform: template
     name: "Display Update Interval (minutes)"
     id: display_update_interval_select
-    options: ["1", "5", "10", "15", "20", "25", "30", "45", "60", "120"]
-    initial_option: "15"
+    options: ["1", "5", "10", "15", "20", "25", "30", "45", "60", "90", "120"]
+    initial_option: "60"
     set_action:
       - lambda: |-
           id(display_update_interval) = atoi(x.c_str());
@@ -298,6 +308,7 @@ image:
   - file: "${image_black_layer_path}"
     id: black_layer
     type: TRANSPARENT_BINARY
+
   - file: "${image_red_layer_path}"
     id: red_layer
     type: TRANSPARENT_BINARY
@@ -334,7 +345,7 @@ switch:
   - platform: template
     name: "Auto Display Image"
     id: auto_display_image
-    internal: true
+    internal: false
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
@@ -379,7 +390,15 @@ display:
       const int margin = 10;
       int y = margin + 5;
       int left_x = margin;
-      int right_x = it.get_width() / 2 + margin;
+      int mid_left_x = it.get_width() / 5 + margin;  // Moved back halfway
+      int right_x = mid_left_x + it.get_width() / 3 + margin;  // Adjusted for wider column 2
+
+      // Draw horizontal line below the date
+      it.line(margin, y + 40, it.get_width() - margin, y + 40, COLOR_ON);  // Horizontal line
+
+      // Draw vertical lines starting below the horizontal line
+      it.line(mid_left_x - 5, y + 40, mid_left_x - 5, y + 200, COLOR_ON);  // Left vertical line
+      it.line(right_x - 5, y + 40, right_x - 5, y + 200, COLOR_ON);      // Right vertical line
 
       // Date
       auto current_time = id(homeassistant_time).now();
@@ -391,8 +410,8 @@ display:
 
       // Left Column
       int left_y = y;
-      int line_height_small = 32; // 21px font size * 1.5
-      int line_height_medium = 36; // 24px font size * 1.5
+      int line_height_small = 32; // 20px font size * 1.6
+      int line_height_medium = 36; // 22px font size * 1.6
 
       // Weather Section Title
       it.print(left_x, left_y, id(font_medium_bold), COLOR_ON, "Weather");
@@ -404,7 +423,7 @@ display:
       } else {
         it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "N/A");
       }
-      left_y += line_height_medium;
+      left_y += line_height_medium; // Move down after the current temperature
 
       // Max Temperature
       if (!isnan(id(weather_max_temp).state)) {
@@ -428,40 +447,38 @@ display:
       } else {
         it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Rain: N/A");
       }
-      left_y += line_height_small + 10; // Extra spacing before next section
+      left_y += line_height_small + 10;  // Extra spacing before next section
 
-      // Room Temperatures Section Title
-      it.print(left_x, left_y, id(font_medium_bold), COLOR_ON, "Room Temperatures");
-      left_y += line_height_medium;
+      // Mid Left Column (Room Temperature)
+      int mid_left_y = y;
+
+      // Room Temperature Section Title
+      it.print(mid_left_x, mid_left_y, id(font_medium_bold), COLOR_ON, "Room Temperature");
+      mid_left_y += line_height_medium;
 
       // Kitchen Temperature
       if (!isnan(id(kitchen_temperature).state)) {
-        it.printf(left_x, left_y, id(font_small), COLOR_ON, "Kitchen: %.1f°C", id(kitchen_temperature).state);
+        it.printf(mid_left_x, mid_left_y, id(font_small), COLOR_ON, "Kitchen: %.1f°C", id(kitchen_temperature).state);
       } else {
-        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Kitchen: N/A");
+        it.print(mid_left_x, mid_left_y, id(font_small_italic), COLOR_ON, "Kitchen: N/A");
       }
-      left_y += line_height_small;
+      mid_left_y += line_height_small;
 
       // Bedroom Temperature
       if (!isnan(id(bedroom_temperature).state)) {
-        it.printf(left_x, left_y, id(font_small), COLOR_ON, "Bedroom: %.1f°C", id(bedroom_temperature).state);
+        it.printf(mid_left_x, mid_left_y, id(font_small), COLOR_ON, "Bedroom: %.1f°C", id(bedroom_temperature).state);
       } else {
-        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Bedroom: N/A");
+        it.print(mid_left_x, mid_left_y, id(font_small_italic), COLOR_ON, "Bedroom: N/A");
       }
-      left_y += line_height_small;
+      mid_left_y += line_height_small;
 
       // Bathroom Temperature
       if (!isnan(id(bathroom_temperature).state)) {
-        it.printf(left_x, left_y, id(font_small), COLOR_ON, "Bathroom: %.1f°C", id(bathroom_temperature).state);
+        it.printf(mid_left_x, mid_left_y, id(font_small), COLOR_ON, "Bathroom: %.1f°C", id(bathroom_temperature).state);
       } else {
-        it.print(left_x, left_y, id(font_small_italic), COLOR_ON, "Bathroom: N/A");
+        it.print(mid_left_x, mid_left_y, id(font_small_italic), COLOR_ON, "Bathroom: N/A");
       }
-      left_y += line_height_small + 10; // Extra spacing before next section
-
-      // Habit Tracker Placeholder
-      it.print(left_x, left_y, id(font_medium_bold), COLOR_ON, "Habit Tracker");
-      // Leave space for future content
-      left_y += line_height_medium + line_height_small * 3;
+      mid_left_y += line_height_small;
 
       // Upcoming Events Section Title
       it.print(right_x, y, id(font_medium_bold), COLOR_ON, "Upcoming Events");
@@ -471,17 +488,22 @@ display:
       struct Event {
         std::string name;
         std::string time;
+        int calendar_index;
       };
       std::vector<Event> events_list;
 
-      if (id(calendar_1).has_state() && id(calendar_1_time).has_state()) {
-        events_list.emplace_back(Event{"Event 1: " + id(calendar_1).state, id(calendar_1_time).state});
-      }
-      if (id(calendar_2).has_state() && id(calendar_2_time).has_state()) {
-        events_list.emplace_back(Event{"Event 2: " + id(calendar_2).state, id(calendar_2_time).state});
-      }
-      if (id(calendar_3).has_state() && id(calendar_3_time).has_state()) {
-        events_list.emplace_back(Event{"Event 3: " + id(calendar_3).state, id(calendar_3_time).state});
+      // Collect up to 6 events
+      for (int i = 1; i <= 6; ++i) {
+        std::string cal_id = "calendar_" + std::to_string(i);
+        std::string cal_time_id = "calendar_" + std::to_string(i) + "_time";
+
+        if (id(cal_id.c_str()).has_state() && id(cal_time_id.c_str()).has_state()) {
+          events_list.emplace_back(Event{
+            id(cal_id.c_str()).state,
+            id(cal_time_id.c_str()).state,
+            i  // Calendar index
+          });
+        }
       }
 
       // Sort Events by Time
@@ -489,19 +511,55 @@ display:
         return a.time < b.time;
       });
 
-      // Display Events (Limit to 4)
+      // Display Events (Limit to 6)
       int event_count = 0;
       for (const auto &event : events_list) {
-        if (event_count < 4) {
-          // Extract time part from ISO 8601 format
-          std::string event_time = event.time.substr(11, 5);
-          std::string event_display = event_time + " - " + event.name;
-          it.print(right_x, right_y, id(font_small), COLOR_ON, event_display.c_str());
+        if (event_count < 6) {
+          // Parse event time
+          struct tm event_tm;
+          strptime(event.time.c_str(), "%Y-%m-%dT%H:%M:%S", &event_tm);
+          time_t event_time_t = mktime(&event_tm);
+          time_t now_time_t = id(homeassistant_time).now().timestamp;
+
+          double diff_seconds = difftime(event_time_t, now_time_t);
+          int diff_days = diff_seconds / (60 * 60 * 24);
+
+          char event_time_str[32];
+          if (diff_days == 0) {
+            strftime(event_time_str, sizeof(event_time_str), "%H:%M", &event_tm);
+          } else if (diff_days == 1) {
+            strftime(event_time_str, sizeof(event_time_str), "%H:%M Tomorrow", &event_tm);
+          } else if (diff_days < 7) {
+            strftime(event_time_str, sizeof(event_time_str), "%H:%M %a", &event_tm);
+          } else {
+            strftime(event_time_str, sizeof(event_time_str), "%H:%M %a %d/%m", &event_tm);
+          }
+
+          std::string event_display = std::string(event_time_str) + ": " + event.name;
+
+          // Set formatting based on calendar index
+          auto font = id(font_small);
+          auto color = COLOR_ON;
+
+          if (event.calendar_index == 1 && ${calendar_1_bold} == 'true') {
+            font = id(font_small_bold);
+          }
+          if (event.calendar_index == 1 && ${calendar_1_red} == 'true') {
+            color = CUSTOM_RED;
+          }
+          if (event.calendar_index == 3 && ${calendar_3_bold} == 'true') {
+            font = id(font_small_bold);
+          }
+          if (event.calendar_index == 3 && ${calendar_3_red} == 'true') {
+            color = CUSTOM_RED;
+          }
+
+          it.print(right_x, right_y, font, color, event_display.c_str());
           right_y += line_height_small;
           event_count++;
         }
       }
-      if (events_list.size() > 4) {
+      if (events_list.size() > 6) {
         it.print(right_x, right_y, id(font_small), COLOR_ON, "...more events");
         right_y += line_height_small;
       } else if (events_list.empty()) {

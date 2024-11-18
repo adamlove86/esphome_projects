@@ -1,3 +1,4 @@
+# ========================common-node-config.yaml==========================
 esphome:
   name: ${node_name}
   platformio_options:
@@ -43,6 +44,7 @@ wifi:
 # Web server for monitoring
 web_server:
   port: 80
+#  ota: true # Enabling 'ota' is not supported for IDF framework yet.
 
 # Enable mDNS
 mdns:
@@ -85,14 +87,17 @@ interval:
             - output.turn_off: status_led
             - delay: 1s
 
-# Binary Sensors for Presence Detection and Radar
-binary_sensor:
-  # Presence Detection via GPIO
-  - platform: gpio
-    pin: ${presence_gpio}
-    name: "${room_name} Presence"
-    device_class: presence
+  - interval: 1s
+    then:
+      - lambda: |-
+          id(combined_presence).publish_state(
+            id(radar_has_target).state || 
+            id(radar_moving_target).state || 
+            id(radar_still_target).state
+          );
 
+# Binary Sensors for Radar Presence Detection
+binary_sensor:
   # Radar Binary Sensors
   - platform: ld2410
     has_target:
@@ -107,6 +112,12 @@ binary_sensor:
     has_still_target:
       name: "${room_name} Radar - Stillness Detected"
       id: radar_still_target
+
+  # Combined Presence Detection
+  - platform: template
+    name: "${room_name} Combined Presence"
+    id: combined_presence
+    device_class: presence
 
 # Sensors for Radar and Environment
 sensor:
@@ -183,7 +194,7 @@ sensor:
 
   # Temperature and Humidity Sensors
   - platform: dht
-    pin: GPIO18  # Adjust if necessary
+    pin: ${dht_sensor_gpio}
     model: AM2302
     temperature:
       name: "${room_name} Temperature"
@@ -213,20 +224,28 @@ sensor:
     lambda: |-
       float T = id(Temperature).state;
       float RH = id(Humidity).state;
-      ESP_LOGD("Apparent Temperature", "Temperature: %.2f, Humidity: %.2f", T, RH);
+
       if (T < -40 || T > 80 || RH < 0 || RH > 100) {
         ESP_LOGD("Apparent Temperature", "Rejected out of range values: T: %.2f, RH: %.2f", T, RH);
         return {};
       }
-      float alpha = log(RH/100) + ((17.27 * T) / (237.7 + T));
-      float Td = (237.7 * alpha) / (17.27 - alpha);
-      float H = T + 0.5555 * (6.11 * exp((5417.7530 * ((1/273.16) - (1/(273.15 + Td))))) - 10);
-      if (H < -40 || H > 80) {
-        ESP_LOGD("Apparent Temperature", "Calculated out of range apparent temperature: %.2f", H);
+
+      float T_F = T * 9/5 + 32;
+      float HI = -42.379 + 2.04901523 * T_F + 10.14333127 * RH - 0.22475541 * T_F * RH
+                - 6.83783e-3 * T_F * T_F - 5.481717e-2 * RH * RH
+                + 1.22874e-3 * T_F * T_F * RH + 8.5282e-4 * T_F * RH * RH
+                - 1.99e-6 * T_F * T_F * RH * RH;
+
+      float HI_C = (HI - 32) * 5/9;
+
+      if (HI_C < -40 || HI_C > 80) {
+        ESP_LOGD("Apparent Temperature", "Calculated out of range apparent temperature: %.2f", HI_C);
         return {};
       }
-      ESP_LOGD("Apparent Temperature", "Calculated apparent temperature: %.2f", H);
-      return H;
+
+      ESP_LOGD("Apparent Temperature", "Calculated apparent temperature: %.2f", HI_C);
+      return HI_C;
+
 
 # Number Components for LD2410 Parameters
 number:

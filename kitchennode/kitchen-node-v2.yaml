@@ -1,0 +1,16 @@
+# kitchennode.yaml:
+substitutions:
+  node_name: "kitchen-node-v2"
+  room_name: "Kitchen"
+  api_encryption_key: !secret kitchennode_v2_key
+  status_led_gpio: GPIO0
+  uart_rx_pin: GPIO2
+  uart_tx_pin: GPIO21
+  dht_sensor_gpio: GPIO17
+
+# Enable logging with INFO level
+logger:
+  level: INFO
+  baud_rate: 0  # Disable UART logging to prevent interference
+
+<<: !include common-node-config.yaml
